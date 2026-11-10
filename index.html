@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Administración de placas</title>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1b2a41;
+      background: #f2f5fa;
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .header {
+      background: linear-gradient(115deg, #15253d 0%, #294d77 100%);
+      color: white; padding: 30px max(20px, calc((100vw - 1150px) / 2));
+    }
+    .header h1 { margin: 0 0 5px; font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -.025em; }
+    .header p { margin: 0; opacity: .83; max-width: 760px; line-height: 1.55; }
+    main { max-width: 1190px; margin: 0 auto; padding: 22px 20px 55px; }
+    .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    .stat { background: white; border: 1px solid #dce4ee; border-radius: 13px; padding: 12px 20px; min-width: 128px; box-shadow: 0 3px 12px #0f294009; }
+    .stat b { font-size: 1.55rem; display: block; color: #234776; }
+    .stat span { color: #63738a; font-size: .82rem; }
+    .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 17px; align-items: start; }
+    .panel { background: white; border: 1px solid #dce4ee; border-radius: 17px; box-shadow: 0 6px 23px #152b4b0a; overflow: hidden; }
+    .panel-head { padding: 20px 20px 16px; border-bottom: 1px solid #e7edf3; }
+    .panel-head h2 { font-size: 1.06rem; margin: 0 0 6px; }
+    .subtle { color: #64758b; font-size: .87rem; line-height: 1.55; margin: 0; }
+    .sidebar-tools { display: grid; gap: 9px; padding: 13px; border-bottom: 1px solid #e7edf3; }
+    input, select { border: 1px solid #ced8e5; border-radius: 9px; background: #fff; color: #192c44; width: 100%; padding: 10px 12px; min-height: 42px; }
+    input:focus, select:focus { outline: 3px solid #a5c6ff88; border-color: #4179c7; }
+    input[readonly] { background: #f2f5f9; color: #5a6c82; }
+    input[type="password"] { letter-spacing: .05em; }
+    .btn { border: 1px solid #cbd7e5; background: #fff; color: #23456f; border-radius: 9px; min-height: 41px; padding: 9px 14px; font-weight: 650; white-space: nowrap; }
+    .btn:hover:not(:disabled) { background: #edf4ff; }
+    .btn-primary { color: #fff; background: #275caa; border-color: #275caa; }
+    .btn-primary:hover:not(:disabled) { background: #1e4e94; }
+    .btn-download { background: #eef4fc; }
+    .user-list { max-height: 64vh; overflow-y: auto; padding: 8px; }
+    .user-item { display: block; width: 100%; padding: 12px 13px; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 10px; margin-bottom: 3px; }
+    .user-item:hover { background: #f4f7fd; }
+    .user-item.active { background: #eaf2ff; border-color: #bfd6fa; }
+    .user-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .user-name { font-weight: 700; overflow-wrap: anywhere; }
+    .user-meta { font-size: .78rem; color: #667891; display: block; margin-top: 5px; }
+    .dot { width: 9px; height: 9px; border-radius: 100%; background: #9eacbc; flex: 0 0 auto; }
+    .dot.ready { background: #2a9969; }
+    .dot.error { background: #d34d52; }
+    .dot.dirty { background: #e4a42d; }
+    .dot.inactive { background: #9cabbc; }
+    .dot.new { background: #5076c4; }
+    .creation { background: #f4f8ff; border: 1px solid #d7e4f6; border-radius: 10px; padding: 13px; display: grid; gap: 9px; }
+    .creation .actions { margin: 0; }
+    .creation .btn { white-space: normal; }
+    .btn-add { background: #eaf2ff; border-color: #a5c3ed; }
+    .stat b { font-variant-numeric: tabular-nums; }
+    .user-item .user-meta { line-height: 1.4; }
+    .pending-note { color: #97620d; }
+
+    .detail { padding: 22px; }
+    .detail-title { display: flex; flex-wrap: wrap; gap: 11px; align-items: center; justify-content: space-between; margin-bottom: 17px; }
+    .detail-title h2 { margin: 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+    .chip { display: inline-block; border-radius: 999px; color: #366b56; background: #e5f5ed; font-size: .74rem; font-weight: 700; padding: 5px 10px; }
+    .chip.dirty { background: #fff1d5; color: #835e16; }
+    .chip.error { background: #fde8e8; color: #9e393f; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .field { display: block; min-width: 0; }
+    .field-label { display: block; font-size: .83rem; color: #465c76; font-weight: 700; margin-bottom: 7px; }
+    .hint { font-size: .77rem; color: #73839a; margin: 6px 0 0; line-height: 1.45; }
+    .full { grid-column: 1 / -1; }
+    .section-title { font-size: .96rem; margin: 24px 0 11px; padding-top: 18px; border-top: 1px solid #e7edf3; }
+    .word-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 21px 0 0; }
+    .message { margin: 15px 0 0; border-radius: 9px; padding: 12px 13px; background: #eff5fc; color: #284c75; line-height: 1.5; font-size: .89rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .message:empty { display: none; }
+    .message.error { color: #8a303a; background: #feeeee; }
+    .message.ok { color: #246149; background: #e8f7ed; }
+    .note { padding: 16px; border: 1px solid #e0e9f3; background: #f8fafd; border-radius: 11px; margin-top: 20px; }
+    .note h3 { margin: 0 0 6px; font-size: .98rem; }
+    .note p { margin: 0 0 12px; }
+    .note p:last-child { margin-bottom: 0; }
+    .github-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .empty { padding: 25px; color: #61738a; line-height: 1.65; }
+    code { padding: 2px 4px; background: #edf1f6; color: #244368; border-radius: 4px; }
+    .smallprint { margin-top: 15px; color: #6e7d91; font-size: .8rem; line-height: 1.5; }
+    .hidden { display: none !important; }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; }
+      .user-list { max-height: 230px; }
+      .header { padding: 26px 20px; }
+    }
+    @media (max-width: 460px) {
+      .form-grid, .word-grid, .github-grid { grid-template-columns: 1fr; }
+      .detail { padding: 17px; }
+      .full { grid-column: auto; }
+      .stat { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+<header class="header">
+  <h1>Administración de placas</h1>
+  <p>Administra usuarios activos e inactivos, sus palabras de reconocimiento y los archivos de configuración.</p>
+</header>
+<main>
+  <div class="stats" aria-label="Resumen">
+    <div class="stat"><b id="stat-total">0</b><span>Usuarios en listado</span></div>
+    <div class="stat"><b id="stat-active">0</b><span>Activos</span></div>
+    <div class="stat"><b id="stat-ok">0</b><span>Archivos leídos</span></div>
+    <div class="stat"><b id="stat-error">0</b><span>Errores de lectura</span></div>
+    <div class="stat"><b id="stat-dirty">0</b><span>Cambios por guardar</span></div>
+  </div>
+  <div class="layout">
+    <aside class="panel" aria-label="Usuarios">
+      <div class="panel-head">
+        <h2>Usuarios</h2>
+        <p class="subtle">Activos e inactivos; se obtienen de <code>./usuarios.txt</code>.</p>
+      </div>
+      <div class="sidebar-tools">
+        <input id="search" type="search" placeholder="Buscar usuario o titular" aria-label="Buscar usuario o titular">
+        <button id="show-create" class="btn btn-add" type="button">+ Agregar usuario</button>
+        <div id="create-panel" class="creation hidden">
+          <label class="field" for="new-id"><span class="field-label">Identificador del nuevo usuario</span></label>
+          <input id="new-id" placeholder="Ej.: usuario04" maxlength="80" spellcheck="false" autocomplete="off">
+          <p class="hint">El nombre debe coincidir con la carpeta y el repositorio del nuevo usuario.</p>
+          <div class="actions">
+            <button id="create-confirm" class="btn btn-primary" type="button">Crear ficha</button>
+            <button id="create-cancel" class="btn" type="button">Cancelar</button>
+          </div>
+          <div id="create-message" class="message" role="status" aria-live="polite"></div>
+        </div>
+        <button id="download-list" class="btn btn-download" type="button">↓ Descargar usuarios.txt</button>
+        <button id="reload" class="btn" type="button">↻ Volver a leer los archivos</button>
+      </div>
+      <div id="list" class="user-list" aria-live="polite"><div class="empty">Cargando usuarios…</div></div>
+    </aside>
+
+    <section class="panel" aria-label="Edición de usuario">
+      <div id="placeholder" class="empty">Selecciona un usuario de la lista para editar su configuración.</div>
+      <div id="detail" class="detail hidden">
+        <div class="detail-title">
+          <h2 id="detail-heading">Usuario</h2>
+          <span id="status-chip" class="chip">Sin cambios</span>
+        </div>
+        <form id="edit-form" autocomplete="off" novalidate>
+          <div class="form-grid">
+            <label class="field">
+              <span class="field-label">Usuario</span>
+              <input id="field-user" readonly>
+              <span class="hint">Identificador de la carpeta. Para cambiarlo hay que modificar también <code>usuarios.txt</code> y el nombre de la carpeta/repo.</span>
+            </label>
+            <label class="field">
+              <span class="field-label">Activo</span>
+              <select id="field-active">
+                <option value="activ1">activ1 — Activo</option>
+                <option value="activ0">activ0 — Inactivo</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">Modo de configuración</span>
+              <select id="field-mode">
+                <option value="config0">config0 — Ocultar ⚙</option>
+                <option value="config1">config1 — Mostrar ⚙</option>
+              </select>
+            </label>
+            <label class="field full">
+              <span class="field-label">Nombre del titular</span>
+              <input id="field-title" maxlength="200" placeholder="Nombre del titular">
+              <span class="hint">Se guarda como cuarta línea del archivo.</span>
+            </label>
+            <label class="field full">
+              <span class="field-label">URL de destino</span>
+              <input id="field-url" type="url" inputmode="url" placeholder="https://ejemplo.com/destino/" spellcheck="false">
+              <span class="hint">Las cuatro palabras redirigen a esta misma URL.</span>
+            </label>
+          </div>
+          <h3 class="section-title">Palabras a reconocer</h3>
+          <div class="word-grid">
+            <label class="field"><span class="field-label">Palabra 1</span><input class="word" id="word-1" maxlength="100" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Palabra 2</span><input class="word" id="word-2" maxlength="100" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Palabra 3</span><input class="word" id="word-3" maxlength="100" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Palabra 4</span><input class="word" id="word-4" maxlength="100" spellcheck="false"></label>
+          </div>
+          <p class="hint">Se guardan juntas en la línea 6, separadas por un espacio, sin comas. Cada palabra debe ser una sola cadena sin espacios.</p>
+          <div class="actions">
+            <button id="download" class="btn btn-download" type="button">↓ Descargar usuario.txt</button>
+            <button id="undo" class="btn" type="button">Descartar cambios</button>
+            <button id="retry" class="btn" type="button">↻ Releer este usuario</button>
+          </div>
+          <div id="edit-message" class="message" role="status" aria-live="polite"></div>
+        </form>
+
+        <section class="note" aria-labelledby="github-heading">
+          <h3 id="github-heading">Guardar directamente en GitHub</h3>
+          <p class="subtle">Para editar usuarios existentes, el token necesita <strong>Contents: Read and write</strong> en su repositorio. Para agregar uno nuevo, necesita el mismo permiso tanto en su repositorio como en <code>00_Main</code>.</p>
+          <div class="github-grid" style="margin-top:14px">
+            <label class="field"><span class="field-label">Propietario de GitHub</span><input id="gh-owner" placeholder="Ej.: memorarv" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Repositorio de este usuario</span><input id="gh-repo" placeholder="Ej.: usuario01" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Rama (opcional, para ambos repositorios)</span><input id="gh-branch" placeholder="Vacío = rama predeterminada" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Ruta del archivo en el repositorio</span><input id="gh-path" value="usuario.txt" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Repositorio principal (lista de usuarios)</span><input id="gh-main-repo" value="00_Main" spellcheck="false"></label>
+            <label class="field"><span class="field-label">Ruta de usuarios.txt</span><input id="gh-list-path" value="usuarios.txt" spellcheck="false"></label>
+            <label class="field full"><span class="field-label">Token de GitHub (no se guarda)</span><input id="gh-token" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <div class="actions">
+            <button id="github-save" type="button" class="btn btn-primary">Guardar cambios en GitHub</button>
+          </div>
+          <div id="github-message" class="message" role="status" aria-live="polite"></div>
+          <p class="smallprint">Para crear un usuario, primero crea su repositorio vacío (p. ej., <code>usuario04</code>) en GitHub. Esta aplicación crea <code>usuario.txt</code> allí y luego agrega el identificador a <code>00_Main/usuarios.txt</code>. La creación del repositorio y la activación de GitHub Pages no son automáticas. El token permanece solo en el formulario y no se guarda; no compartas tokens.</p>
+        </section>
+        <p class="smallprint" id="file-path"></p>
+      </div>
+    </section>
+  </div>
+  <p class="smallprint">Formato de <code>usuario.txt</code>: línea 1 = usuario; línea 2 = activ0/activ1; línea 3 = config0/config1; línea 4 = titular; línea 5 = URL; línea 6 = exactamente 4 palabras. <code>usuarios.txt</code> enumera todos los usuarios, incluso los inactivos. También se pueden leer archivos antiguos de cinco líneas; al guardar, se convierten al formato nuevo con <code>activ1</code>. Las líneas que empiezan por # en el listado son comentarios.</p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const BASE = new URL('./', location.href);
+  const USER_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+  const REPO_NAME = /^[a-zA-Z0-9_.-]+$/;
+  const words = [1, 2, 3, 4].map(n => $('word-' + n));
+  const mainRepoFromUrl = decodeURIComponent(BASE.pathname.split('/').filter(Boolean).at(-1) || '00_Main');
+  const state = {
+    users: new Map(), ids: [], selected: null, epoch: 0, saving: false,
+    userListText: '', listLoaded: false, repoOverrides: new Map()
+  };
+
+  $('gh-main-repo').value = mainRepoFromUrl;
+  const hostMatch = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  if (hostMatch) $('gh-owner').value = hostMatch[1];
+
+  function normalize(text) {
+    return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+  }
+  function parseUserList(text) {
+    const all = text.replace(/^\uFEFF/, '').split(/\r?\n/)
+      .map(line => line.replace(/#.*$/, '').trim()).filter(Boolean).join(' ')
+      .split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+    const ids = [...new Set(all)];
+    const invalid = ids.filter(id => !USER_ID.test(id) || id === '.' || id === '..');
+    if (invalid.length) throw new Error('Identificadores no válidos en usuarios.txt: ' + invalid.join(', '));
+    return ids;
+  }
+  function parseConfig(raw) {
+    const lines = normalize(raw).split('\n');
+    if (lines.length !== 6 && lines.length !== 5) {
+      throw new Error(`El archivo tiene ${lines.length} líneas; se esperan 6 (o 5 del formato anterior).`);
+    }
+    const legacy = lines.length === 5;
+    const l = legacy ? [lines[0], 'activ1', ...lines.slice(1)] : lines;
+    return {
+      fields: {
+        user: l[0].trim(), active: l[1].trim(), mode: l[2].trim(),
+        title: l[3].trim(), url: l[4].trim(),
+        words: l[5].trim().split(/\s+/).filter(Boolean)
+      }, legacy
+    };
+  }
+  function clone(f) {
+    return { user: f.user, active: f.active, mode: f.mode, title: f.title, url: f.url, words: [...f.words] };
+  }
+  function serialize(f) {
+    return [f.user, f.active, f.mode, f.title, f.url, f.words.join(' ')].join('\n') + '\n';
+  }
+  function makeNew(id) {
+    const fields = { user: id, active: 'activ1', mode: 'config0', title: '', url: '', words: ['', '', '', ''] };
+    return { folder: id, status: 'ok', original: clone(fields), draft: clone(fields),
+      originalText: null, registered: false, fileCreated: false, legacy: false, error: '' };
+  }
+  function userUrl(id) { return new URL('../' + encodeURIComponent(id) + '/usuario.txt', BASE); }
+  async function getText(url) {
+    const u = new URL(url);
+    u.searchParams.set('_', Date.now().toString());
+    const response = await fetch(u.href, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status} al leer ${url.href || url}`);
+    return response.text();
+  }
+  function sameFields(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function isDirty(r) {
+    return Boolean(r && r.status === 'ok' &&
+      (!r.registered || !r.fileCreated || !sameFields(r.draft, r.original)));
+  }
+  function anyPending() { return [...state.users.values()].some(isDirty); }
+  function setMessage(id, message, kind = '') {
+    const node = $(id);
+    node.textContent = message;
+    node.className = 'message' + (kind ? ' ' + kind : '');
+  }
+  function refreshStats() {
+    const all = [...state.users.values()];
+    $('stat-total').textContent = state.ids.filter(id => state.users.get(id)?.registered).length;
+    $('stat-active').textContent = all.filter(r => r.status === 'ok' && r.draft.active === 'activ1').length;
+    $('stat-ok').textContent = all.filter(r => r.status === 'ok' && r.fileCreated).length;
+    $('stat-error').textContent = all.filter(r => r.status === 'error').length;
+    $('stat-dirty').textContent = all.filter(isDirty).length;
+  }
+  function describe(r) {
+    if (r.status === 'error') return ['error', 'Error de lectura'];
+    if (r.status === 'loading') return ['', 'Cargando…'];
+    const active = r.draft.active === 'activ1' ? 'Activo' : 'Inactivo';
+    if (!r.registered) return ['new', 'Nuevo · falta registrar · ' + active];
+    if (isDirty(r)) return ['dirty', 'Cambios pendientes · ' + active];
+    return [r.draft.active === 'activ1' ? 'ready' : 'inactive', active + ' · ' + r.draft.mode + (r.legacy ? ' · formato anterior' : '')];
+  }
+  function renderList() {
+    const filter = $('search').value.toLocaleLowerCase('es');
+    const list = $('list');
+    list.replaceChildren();
+    const matches = state.ids.filter(id => {
+      const title = state.users.get(id)?.draft?.title || '';
+      return (id + ' ' + title).toLocaleLowerCase('es').includes(filter);
+    });
+    if (!matches.length) {
+      const el = document.createElement('div');
+      el.className = 'empty';
+      el.textContent = state.ids.length ? 'No hay coincidencias.' : 'No hay usuarios. Usa «Agregar usuario».';
+      list.append(el);
+    }
+    for (const id of matches) {
+      const record = state.users.get(id);
+      const [dotClass, summary] = describe(record);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'user-item' + (state.selected === id ? ' active' : '');
+      button.setAttribute('aria-current', state.selected === id ? 'true' : 'false');
+      const top = document.createElement('span'); top.className = 'user-top';
+      const name = document.createElement('span'); name.className = 'user-name'; name.textContent = id;
+      const dot = document.createElement('span'); dot.className = 'dot ' + dotClass;
+      dot.setAttribute('aria-hidden', 'true');
+      top.append(name, dot);
+      const meta = document.createElement('span'); meta.className = 'user-meta'; meta.textContent = summary;
+      button.append(top, meta);
+      button.addEventListener('click', () => selectUser(id));
+      list.append(button);
+    }
+    refreshStats();
+  }
+  function selectUser(id) {
+    if (state.saving) return;
+    state.selected = id;
+    renderList();
+    renderEditor();
+  }
+  function clearEditor() {
+    $('detail').classList.add('hidden');
+    $('placeholder').classList.remove('hidden');
+  }
+  function updateChip(r) {
+    const chip = $('status-chip');
+    chip.className = isDirty(r) ? 'chip dirty' : 'chip';
+    chip.textContent = !r.registered ? 'Usuario nuevo · sin registrar'
+      : isDirty(r) ? 'Cambios pendientes' : 'Sin cambios';
+  }
+  function renderEditor() {
+    const id = state.selected;
+    const record = state.users.get(id);
+    if (!record || record.status !== 'ok') {
+      clearEditor();
+      $('placeholder').textContent = record?.status === 'error'
+        ? `No se pudo leer ${userUrl(id)}. ${record.error}. Revisa que exista usuario.txt.`
+        : record?.status === 'loading' ? `Leyendo ${userUrl(id)}…`
+          : 'Selecciona un usuario de la lista para editarlo.';
+      return;
+    }
+    $('placeholder').classList.add('hidden');
+    $('detail').classList.remove('hidden');
+    $('detail-heading').textContent = id;
+    $('field-user').value = record.draft.user;
+    $('field-active').value = record.draft.active;
+    $('field-mode').value = record.draft.mode;
+    $('field-title').value = record.draft.title;
+    $('field-url').value = record.draft.url;
+    words.forEach((input, index) => input.value = record.draft.words[index] || '');
+    $('gh-repo').value = state.repoOverrides.get(id) || id;
+    $('file-path').textContent = 'Archivo publicado: ' + userUrl(id).href;
+    updateChip(record);
+    $('undo').disabled = !record.registered && !record.fileCreated
+      ? false : !isDirty(record);
+    $('retry').disabled = !record.registered;
+    $('github-save').textContent = record.registered
+      ? 'Guardar cambios en GitHub' : 'Crear usuario y registrarlo en GitHub';
+    let warning = '';
+    if (record.draft.user !== record.folder) warning = `La línea 1 indica «${record.draft.user}» y la carpeta es «${id}».`;
+    else if (record.legacy) warning = 'Archivo antiguo de 5 líneas. Al guardar se agregará activ1 como segunda línea.';
+    else if (!record.registered) warning = 'Usuario nuevo: completa todos los campos y guarda en GitHub. También puedes descargar usuario.txt y usuarios.txt para subirlos manualmente.';
+    setMessage('edit-message', warning, warning && record.registered && !record.legacy ? 'error' : '');
+    setMessage('github-message', '');
+  }
+  function updateDraft() {
+    if (state.saving) return;
+    const r = state.users.get(state.selected);
+    if (!r || r.status !== 'ok') return;
+    r.draft = {
+      user: $('field-user').value.trim(), active: $('field-active').value,
+      mode: $('field-mode').value, title: $('field-title').value,
+      url: $('field-url').value.trim(), words: words.map(input => input.value.trim())
+    };
+    updateChip(r);
+    $('undo').disabled = !isDirty(r);
+    setMessage('edit-message', '');
+    setMessage('github-message', '');
+    renderList();
+  }
+  function validationError(r) {
+    const f = r.draft;
+    if (!USER_ID.test(f.user) || f.user !== r.folder) return 'El identificador debe coincidir con la carpeta: ' + r.folder;
+    if (!['activ0', 'activ1'].includes(f.active)) return 'Activo debe ser activ0 o activ1.';
+    if (!['config0', 'config1'].includes(f.mode)) return 'Configuración debe ser config0 o config1.';
+    if (!f.title.trim() || /[\r\n]/.test(f.title)) return 'Introduce un nombre de titular (sin saltos de línea).';
+    if (/\s/.test(f.url)) return 'La URL no puede contener espacios.';
+    try {
+      const u = new URL(f.url);
+      if (!['http:', 'https:'].includes(u.protocol)) throw new Error('Protocolo no permitido');
+    } catch (_) { return 'Introduce una URL válida que comience con https:// o http://.'; }
+    if (f.words.length !== 4 || f.words.some(w => !w || /\s/.test(w))) return 'Indica exactamente 4 palabras, sin espacios internos.';
+    if (new Set(f.words.map(w => w.toLocaleLowerCase('es'))).size !== 4) return 'Las cuatro palabras deben ser distintas.';
+    return '';
+  }
+  async function loadUser(id, epoch) {
+    const r = state.users.get(id);
+    if (!r) return;
+    r.status = 'loading'; r.error = '';
+    try {
+      const raw = await getText(userUrl(id));
+      if (epoch !== state.epoch) return;
+      const parsed = parseConfig(raw);
+      r.original = clone(parsed.fields);
+      r.draft = clone(parsed.fields);
+      r.originalText = normalize(raw);
+      r.registered = true;
+      r.fileCreated = true;
+      r.legacy = parsed.legacy;
+      r.status = 'ok';
+    } catch (err) {
+      if (epoch !== state.epoch) return;
+      r.status = 'error'; r.error = err.message;
+    }
+    if (epoch === state.epoch) {
+      renderList();
+      if (state.selected === id) renderEditor();
+    }
+  }
+  async function loadAll() {
+    if (state.saving) return;
+    if (anyPending() && !confirm('Hay cambios sin guardar o usuarios nuevos aún sin registrar. ¿Descartarlos y volver a leer?')) return;
+    const epoch = ++state.epoch;
+    state.ids = []; state.users.clear(); state.selected = null;
+    state.listLoaded = false; state.userListText = '';
+    clearEditor();
+    $('list').innerHTML = '<div class="empty">Leyendo usuarios.txt…</div>';
+    refreshStats();
+    try {
+      const raw = await getText(new URL('usuarios.txt', BASE));
+      if (epoch !== state.epoch) return;
+      const ids = parseUserList(raw);
+      state.userListText = raw;
+      state.listLoaded = true;
+      state.ids = ids;
+      ids.forEach(folder => state.users.set(folder, { folder, status: 'loading', registered: true, fileCreated: true, error: '' }));
+      state.selected = ids[0] || null;
+      renderList(); renderEditor();
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(ids.length, 6) }, async () => {
+        while (next < ids.length && epoch === state.epoch) {
+          await loadUser(ids[next++], epoch);
+        }
+      }));
+    } catch (err) {
+      if (epoch !== state.epoch) return;
+      state.selected = null; clearEditor();
+      const msg = document.createElement('div'); msg.className = 'empty';
+      msg.textContent = `No se pudo cargar usuarios.txt: ${err.message}. Comprueba que el archivo está junto a index.html y que accedes a la página por un servidor web.`;
+      $('list').replaceChildren(msg);
+      refreshStats();
+    }
+  }
+  function listWithIds(source, ids) {
+    const listed = new Set(parseUserList(source));
+    let result = normalize(source);
+    for (const id of ids) {
+      if (!listed.has(id)) {
+        result = result ? result + '\n' + id : id;
+        listed.add(id);
+      }
+    }
+    return result + '\n';
+  }
+  function createUser() {
+    if (state.saving || !state.listLoaded) {
+      setMessage('create-message', 'Primero debe cargarse usuarios.txt.', 'error'); return;
+    }
+    const id = $('new-id').value.trim();
+    if (!USER_ID.test(id) || id === '.' || id === '..') {
+      setMessage('create-message', 'Usa un identificador como usuario04, sin espacios ni barras.', 'error'); return;
+    }
+    if (state.ids.some(known => known.toLocaleLowerCase('es') === id.toLocaleLowerCase('es'))) {
+      setMessage('create-message', 'Ese usuario ya existe en la lista.', 'error'); return;
+    }
+    state.ids.push(id);
+    state.users.set(id, makeNew(id));
+    state.selected = id;
+    $('new-id').value = '';
+    $('create-panel').classList.add('hidden');
+    setMessage('create-message', '');
+    $('search').value = '';
+    renderList(); renderEditor();
+    $('field-title').focus();
+  }
+  function downloadText(name, content) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = name;
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function downloadUser() {
+    const r = state.users.get(state.selected);
+    if (!r || r.status !== 'ok') return;
+    const error = validationError(r);
+    if (error) { setMessage('edit-message', error, 'error'); return; }
+    downloadText('usuario.txt', serialize(r.draft));
+    setMessage('edit-message', `Descargado usuario.txt. Súbelo a la raíz del repositorio «${r.folder}». Si es nuevo, también descarga usuarios.txt para agregarlo al listado principal.`, 'ok');
+  }
+  function downloadList() {
+    if (!state.listLoaded) return;
+    downloadText('usuarios.txt', listWithIds(state.userListText, state.ids));
+    const r = state.users.get(state.selected);
+    if (r?.status === 'ok') setMessage('edit-message', 'Descargado usuarios.txt con todos los usuarios, incluidos los nuevos. Sustituye el archivo de 00_Main solo después de crear los archivos usuario.txt correspondientes.', 'ok');
+  }
+  function toB64(text) {
+    const bytes = new TextEncoder().encode(text);
+    let binary = '';
+    for (let n = 0; n < bytes.length; n += 8192) binary += String.fromCharCode(...bytes.subarray(n, n + 8192));
+    return btoa(binary);
+  }
+  function fromB64(text) {
+    const binary = atob(text.replace(/\s/g, ''));
+    return new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0)));
+  }
+  class GitHubError extends Error {
+    constructor(status, message) { super(`GitHub HTTP ${status}: ${message}`); this.status = status; }
+  }
+  async function apiRequest(url, token, options = {}) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: 'Bearer ' + token,
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...options.headers
+      }
+    });
+    let data;
+    try { data = await response.json(); } catch (_) { data = {}; }
+    if (!response.ok) throw new GitHubError(response.status, data.message || 'Solicitud no completada');
+    return data;
+  }
+  function contentsUrl(owner, repo, path) {
+    return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/` +
+      path.split('/').map(encodeURIComponent).join('/');
+  }
+  function parseRemoteFile(data, path) {
+    if (data.type !== 'file' || !data.sha || typeof data.content !== 'string') {
+      throw new Error('GitHub no devolvió un archivo válido en ' + path);
+    }
+    return normalize(fromB64(data.content));
+  }
+  function validPath(path) {
+    return path && !path.split('/').some(s => !s || s === '.' || s === '..');
+  }
+  async function saveGitHub() {
+    const id = state.selected;
+    const r = state.users.get(id);
+    if (!r || r.status !== 'ok' || state.saving) return;
+    const error = validationError(r);
+    if (error) { setMessage('github-message', error, 'error'); return; }
+    const owner = $('gh-owner').value.trim();
+    const repo = $('gh-repo').value.trim();
+    const branch = $('gh-branch').value.trim();
+    const path = $('gh-path').value.trim().replace(/^\/+/, '');
+    const mainRepo = $('gh-main-repo').value.trim();
+    const listPath = $('gh-list-path').value.trim().replace(/^\/+/, '');
+    const token = $('gh-token').value.trim();
+    if (!REPO_NAME.test(owner) || !REPO_NAME.test(repo) || !validPath(path) || !token ||
+        (!r.registered && (!REPO_NAME.test(mainRepo) || !validPath(listPath)))) {
+      setMessage('github-message', 'Completa y revisa propietario, repositorios, rutas y token.', 'error'); return;
+    }
+    const snapshot = clone(r.draft);
+    const wasNew = !r.registered;
+    const savedText = serialize(snapshot);
+    const fileApi = contentsUrl(owner, repo, path);
+    const listApi = contentsUrl(owner, mainRepo, listPath);
+    const branchQuery = branch ? '?ref=' + encodeURIComponent(branch) : '';
+    const button = $('github-save');
+    state.saving = true;
+    button.disabled = true; $('reload').disabled = true; $('show-create').disabled = true;
+    [...$('edit-form').querySelectorAll('input,select,button')].forEach(el => el.disabled = true);
+    setMessage('github-message', 'Comprobando el archivo del usuario en GitHub…');
+    try {
+      let remote = null;
+      try { remote = await apiRequest(fileApi + branchQuery, token); }
+      catch (e) { if (!(e instanceof GitHubError && e.status === 404 && !r.fileCreated)) throw e; }
+      if (r.fileCreated) {
+        if (!remote) throw new Error('No se encuentra usuario.txt en el repositorio indicado.');
+        if (parseRemoteFile(remote, path) !== r.originalText) {
+          throw new Error('usuario.txt cambió en GitHub desde la última lectura, o la rama no coincide. No se sobrescribió. Vuelve a cargar los archivos.');
+        }
+      } else if (remote && parseRemoteFile(remote, path) !== normalize(savedText)) {
+        throw new Error('El repositorio ya tiene un usuario.txt diferente. No se sobrescribió. Revisa el identificador y el repositorio.');
+      }
+      if (!remote || parseRemoteFile(remote, path) !== normalize(savedText)) {
+        setMessage('github-message', 'Guardando usuario.txt…');
+        await apiRequest(fileApi, token, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `${r.fileCreated ? 'Actualizar' : 'Crear'} usuario.txt: ${id}`,
+            content: toB64(savedText),
+            ...(remote ? { sha: remote.sha } : {}),
+            ...(branch ? { branch } : {})
+          })
+        });
+      }
+      r.original = clone(snapshot);
+      r.originalText = normalize(savedText);
+      r.fileCreated = true;
+      r.legacy = false;
+      if (!r.registered) {
+        setMessage('github-message', 'usuario.txt guardado. Agregando el usuario a usuarios.txt…');
+        const listRemote = await apiRequest(listApi + branchQuery, token);
+        const rawList = parseRemoteFile(listRemote, listPath);
+        const currentIds = parseUserList(rawList);
+        const newList = listWithIds(rawList, [id]);
+        if (!currentIds.includes(id)) {
+          await apiRequest(listApi, token, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: `Agregar usuario ${id} al listado de placas`,
+              content: toB64(newList), sha: listRemote.sha,
+              ...(branch ? { branch } : {})
+            })
+          });
+        }
+        state.userListText = newList;
+        r.registered = true;
+      }
+      setMessage('github-message', wasNew
+        ? `Guardado correctamente: creado ${owner}/${repo}/${path} y registrado ${id} en ${owner}/${mainRepo}/${listPath}. GitHub Pages puede demorar en publicar los cambios.`
+        : `Guardado correctamente en ${owner}/${repo}/${path}. GitHub Pages puede demorar en publicar los cambios.`, 'ok');
+      renderList();
+      if (state.selected === id) {
+        updateChip(r);
+        $('undo').disabled = !isDirty(r);
+        $('retry').disabled = !r.registered;
+        button.textContent = 'Guardar cambios en GitHub';
+      }
+    } catch (err) {
+      let extra = '';
+      if (!r.registered && r.fileCreated) extra = '\nusuario.txt ya se guardó, pero falta registrar el usuario en usuarios.txt. Corrige el problema y vuelve a pulsar Guardar; no se duplicará el archivo.';
+      else if (err instanceof GitHubError && err.status === 404) extra = '\nComprueba que el repositorio ya existe, el token tiene acceso y el nombre de la rama es correcto.';
+      setMessage('github-message', err.message + extra, 'error');
+      renderList();
+    } finally {
+      state.saving = false;
+      button.disabled = false; $('reload').disabled = false; $('show-create').disabled = false;
+      [...$('edit-form').querySelectorAll('input,select,button')].forEach(el => el.disabled = false);
+      const selected = state.users.get(state.selected);
+      $('undo').disabled = selected ? !isDirty(selected) : true;
+      $('retry').disabled = !selected?.registered;
+      button.textContent = selected?.registered ? 'Guardar cambios en GitHub' : 'Crear usuario y registrarlo en GitHub';
+    }
+  }
+  ['field-active','field-mode','field-title','field-url','word-1','word-2','word-3','word-4']
+    .forEach(id => $(id).addEventListener('input', updateDraft));
+  $('edit-form').addEventListener('submit', event => event.preventDefault());
+  $('search').addEventListener('input', renderList);
+  $('download').addEventListener('click', downloadUser);
+  $('download-list').addEventListener('click', downloadList);
+  $('reload').addEventListener('click', loadAll);
+  $('github-save').addEventListener('click', saveGitHub);
+  $('show-create').addEventListener('click', () => {
+    if (!state.listLoaded) { alert('Primero carga usuarios.txt.'); return; }
+    $('create-panel').classList.toggle('hidden');
+    if (!$('create-panel').classList.contains('hidden')) $('new-id').focus();
+  });
+  $('create-cancel').addEventListener('click', () => { $('create-panel').classList.add('hidden'); setMessage('create-message', ''); });
+  $('create-confirm').addEventListener('click', createUser);
+  $('new-id').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createUser(); } });
+  $('retry').addEventListener('click', async () => {
+    const r = state.users.get(state.selected);
+    if (!r || !r.registered || state.saving) return;
+    if (isDirty(r) && !confirm('¿Descartar los cambios y volver a leer?')) return;
+    await loadUser(r.folder, state.epoch);
+  });
+  $('undo').addEventListener('click', () => {
+    const r = state.users.get(state.selected);
+    if (!r || r.status !== 'ok' || state.saving) return;
+    r.draft = clone(r.original);
+    renderEditor(); renderList();
+  });
+  $('gh-repo').addEventListener('input', () => {
+    if (state.selected) state.repoOverrides.set(state.selected, $('gh-repo').value);
+  });
+  window.addEventListener('beforeunload', event => {
+    if (anyPending()) { event.preventDefault(); event.returnValue = ''; }
+  });
+  loadAll();
+})();
+</script>
+</body>
+</html>
