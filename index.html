@@ -207,13 +207,14 @@
             <label class="field"><span class="field-label">Ruta del archivo en el repositorio</span><input id="gh-path" value="usuario.txt" spellcheck="false"></label>
             <label class="field"><span class="field-label">Repositorio principal (lista de usuarios)</span><input id="gh-main-repo" value="00_Main" spellcheck="false"></label>
             <label class="field"><span class="field-label">Ruta de usuarios.txt</span><input id="gh-list-path" value="usuarios.txt" spellcheck="false"></label>
-            <label class="field full"><span class="field-label">Token de GitHub (no se guarda)</span><input id="gh-token" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></label>
+            <label class="field full"><span class="field-label">Token de GitHub (recordado en este navegador)</span><input id="gh-token" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></label>
           </div>
           <div class="actions">
             <button id="github-save" type="button" class="btn btn-primary">Guardar cambios en GitHub</button>
+            <button id="forget-token" type="button" class="btn">Olvidar token</button>
           </div>
           <div id="github-message" class="message" role="status" aria-live="polite"></div>
-          <p class="smallprint">Para crear un usuario, primero crea su repositorio vacío (p. ej., <code>usuario04</code>) en GitHub. Esta aplicación crea <code>usuario.txt</code> allí y luego agrega el identificador a <code>00_Main/usuarios.txt</code>. La creación del repositorio y la activación de GitHub Pages no son automáticas. El token permanece solo en el formulario y no se guarda; no compartas tokens.</p>
+          <p class="smallprint">Para crear un usuario, primero crea su repositorio vacío (p. ej., <code>usuario04</code>) en GitHub. Esta aplicación crea <code>usuario.txt</code> allí y luego agrega el identificador a <code>00_Main/usuarios.txt</code>. La creación del repositorio y la activación de GitHub Pages no son automáticas. El token se recuerda en este navegador para futuros guardados. Úsalo en tu equipo personal. «Olvidar token» elimina la copia guardada. Si el token vence o lo revocas en GitHub, deberás ingresar uno nuevo.</p>
         </section>
         <p class="smallprint" id="file-path"></p>
       </div>
@@ -234,6 +235,27 @@
     users: new Map(), ids: [], selected: null, epoch: 0, saving: false,
     userListText: '', listLoaded: false, repoOverrides: new Map()
   };
+
+  const TOKEN_KEY = 'tempora-admin-github-token:' + BASE.pathname;
+  try { $('gh-token').value = localStorage.getItem(TOKEN_KEY) || ''; }
+  catch (_) { setMessage('github-message', 'El navegador no permite recordar el token. Puedes usarlo mientras la página esté abierta.', 'error'); }
+  function rememberToken() {
+    try {
+      const token = $('gh-token').value.trim();
+      if (token) localStorage.setItem(TOKEN_KEY, token);
+      else localStorage.removeItem(TOKEN_KEY);
+      return true;
+    } catch (_) { return false; }
+  }
+  $('gh-token').addEventListener('input', rememberToken);
+  $('gh-token').addEventListener('change', rememberToken);
+  $('forget-token').addEventListener('click', () => {
+    $('gh-token').value = '';
+    const removed = rememberToken();
+    setMessage('github-message', removed
+      ? 'Token eliminado de este navegador.'
+      : 'No se pudo eliminar el token del almacenamiento. Borra los datos del sitio en tu navegador.', removed ? 'ok' : 'error');
+  });
 
   $('gh-main-repo').value = mainRepoFromUrl;
   const hostMatch = location.hostname.match(/^([^.]+)\.github\.io$/i);
@@ -596,6 +618,7 @@
         (!r.registered && (!REPO_NAME.test(mainRepo) || !validPath(listPath)))) {
       setMessage('github-message', 'Completa y revisa propietario, repositorios, rutas y token.', 'error'); return;
     }
+    rememberToken();
     const snapshot = clone(r.draft);
     const wasNew = !r.registered;
     const savedText = serialize(snapshot);
